@@ -26,16 +26,7 @@ const getProblems = async (problems_url) => {
             throw new Error('Network response not found')
         }
         const json = await response.json()
-        
-        const _problems = json['result']['problems']
-        const problems  = []
-        for (const key in _problems) {
-            const contest_id = _problems[key]['contestId']
-            const prob_index = _problems[key]['index']
-            const problem_id = `${contest_id}-${prob_index}`
-
-            problems.push(problem_id)
-        }
+        const problems = json['result']['problems']
 
         return problems
 
@@ -43,6 +34,19 @@ const getProblems = async (problems_url) => {
         console.error('Error: ' + e)
         throw e
     }
+}
+
+const parseProblems = (problem_list) => {
+    const problems  = []
+    for (const key in problem_list) {
+        const contest_id = problem_list[key]['contestId']
+        const prob_index = problem_list[key]['index']
+        const problem_id = `${contest_id}-${prob_index}`
+
+        problems.push(problem_id)
+    }
+
+    return problems
 }
 
 const getUserSubmissions = async (user_submissions_url) => {
@@ -82,6 +86,22 @@ const getRandomProblem = (problems, user_solved, random_number) => {
     return unsolved[Math.floor(random_number) % unsolved.length]
 }
 
+const getProblemDetails = (problem_list, problem) => {
+    for (const key in problem_list) {
+        const contest_id = problem_list[key]['contestId']
+        const prob_index = problem_list[key]['index']
+        const problem_id = `${contest_id}-${prob_index}`
+
+        if (problem_id == problem) {
+            return {
+                'url': `https://codeforces.com/problemset/problem/${contest_id}/${prob_index}`,
+                'name': problem_list[key]['name'],
+                'rating': problem_list[key]['rating']
+            }
+        }
+    }
+}
+
 const padTo2Digits = (num) => {
     return num.toString().padStart(2, '0');
   }
@@ -100,9 +120,6 @@ async function main() {
     const generator = seedrandom(seed);
     const random_number = generator();
 
-    console.log(seed)
-    console.log(random_number)
-
     // User Information
     const handle = '0paline'
     const user_url = `https://codeforces.com/api/user.info?handles=${handle}`
@@ -118,16 +135,14 @@ async function main() {
     const tags_query = tags.toString().replaceAll(',', ';')
     const problems_url =`https://codeforces.com/api/problemset.problems?tags=${tags_query}`
     const problems_list = await getProblems(problems_url)
+    const problems = parseProblems(problems_list)
     
     // Get a random problem
-    const problem = getRandomProblem(problems_list, user_solved, random_number)
-    console.log(problem)
+    const problem = getRandomProblem(problems, user_solved, random_number)
 
     // Get random problem details
-    const contest_id = problem.split('-')[0]
-    const prob_index = problem.split('-')[1]
-    const problem_link = `https://codeforces.com/problemset/problem/${contest_id}/${prob_index}`
-    console.log(problem_link)
+    const problem_details = getProblemDetails(problems_list, problem)
+    console.log(problem_details)
 }
 
 main()
