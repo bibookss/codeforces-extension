@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     const username = document.getElementById('username')
     const userRating = document.getElementById('user-rating')
     const userRank = document.getElementById('user-rank')
+    const changeUserButton = document.getElementById('change-user-button')
     const problemName = document.getElementById('problem-name')
     const problemRating = document.getElementById('problem-rating')
     const problemTags = document.getElementById('problem-tags')
@@ -27,28 +28,32 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     usernameSaveButton.addEventListener('click', async function () {
         user = await setUserDetails(usernameInput.value)
-        problem = await setProblemDetails(problems, user['solved'])
+        // problem = await setProblemDetails(problems, user['solved'])
 
         // Hide user input div
         inputContainer.style.display = 'none';
+
+        // Show change user button
+        changeUserButton.style.display = 'block';
 
         if (username && userRating && userRank) {
             username.textContent = user['username']
             userRating.textContent = user['rating']
             userRank.textContent = user['rank']
         }
+    })
 
-        if (problemName && problemRating && problemTags && problemLink) {
-            problemName.textContent = problem['name']
-            problemRating.textContent = problem['rating']
-            problemTags.textContent = problem['tags'].join(', ')
-            problemLink.textContent = problem['url']
-        }
+    changeUserButton.addEventListener('click', async function () {
+        // Hide currernt user
+        username.textContent = ''
+        userRating.textContent = ''
+        userRank.textContent = ''
+
+        // Show user input div
+        inputContainer.style.display = 'block';
 
         if (submitContainer) {
-            submitContainer.style.display = 'block';
-            
-            submitStatus.textContent = 'Not Attempted'
+            submitContainer.style.display = 'none';
         }
     })
     
@@ -61,6 +66,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             userRank.textContent = user['rank']
     
             inputContainer.style.display = 'none';
+            changeUserButton.style.display = 'block';
         } else {
             console.log('User not found');
 
@@ -71,6 +77,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     chrome.storage.local.get(['problem'], async function (result) {
         if (result.problem) {
             problem = result.problem
+            console.log(problem)
+
+            if (!isSameDay(new Date(problem['time']), new Date())) {
+                console.log('Date is not same')
+                problem = await setProblemDetails(problems, user['solved'])
+            } else {
+                console.log('Date is same')
+            }
 
             if (problemName && problemRating && problemTags && problemLink) {
                 problemName.textContent = problem['name']
@@ -80,13 +94,23 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         } else {
             console.log('Problem not found');
+            problem = await setProblemDetails(problems, user['solved'])
+
+            if (problemName && problemRating && problemTags && problemLink) {
+                problemName.textContent = problem['name']
+                problemRating.textContent = problem['rating']
+                problemTags.textContent = problem['tags'].join(', ')
+                problemLink.textContent = problem['url']
+            }
         }
     });
+
 });
 
 const setProblemDetails = async (problems, solved) => {
     const problem = getRandomProblem(problems, solved)
     problem['url'] = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`
+    problem['time'] = new Date().toISOString()
 
     // Save problem to storage
     chrome.storage.local.set({ problem: problem }, function () {
@@ -220,4 +244,48 @@ const parseUserSubmissions = (submissions) => {
     }
 
     return solvedProblems
+}
+
+const submitSolution = async (problem, solution) => {
+    let url = `https://codeforces.com/api/problemset.submit?contestId=${problem.contestId}&problemIndex=${problem.index}&source=${solution}&programTypeId=50&sourceFile=a.py`
+
+    // https://codeforces.com/contest/1833/problem/A?csrf_token=3866ab16582adbb5fa9b236e0df7b0df
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        // Check if data.result exists and contains at least one element
+        if (data.result && data.result.length > 0) {
+            const submissions = data.result;
+            const solved = parseUserSubmissions(submissions);
+            return solved;
+        } else {
+            throw new Error('User submissions not found');
+        }
+
+    } catch (error) {
+        console.error('Error fetching user submissions:', error);
+        throw error; 
+    }
+}
+
+const getProblemPage = async (problem) => { 
+    let url = `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`
+    try {
+        const response = await fetch(url);
+        const data = await response.text();
+
+        console.log(data)
+
+    } catch (error) {
+        console.error('Error fetching problem page:', error);
+        throw error; 
+    }
+}
+
+const isSameDay = (date1, date2) => {
+    return date1.getFullYear() === date2.getFullYear() &&
+        date1.getMonth() === date2.getMonth() &&
+        date1.getDate() === date2.getDate();
 }
