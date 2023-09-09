@@ -1,148 +1,223 @@
-const getUserInformation = async (user_url) => {
-    try {
-        const response = await fetch(user_url);
-        if (!response.ok) {
-            throw new Error('Network response not found')
+document.addEventListener('DOMContentLoaded', async function () {
+    // clear storage
+    // chrome.storage.local.clear(function () { 
+    //     var error = chrome.runtime.lastError; 
+    //     if (error) { 
+    //         console.error(error); 
+    //     }
+    // })
+
+    const inputContainer = document.getElementById('input-container')
+    const usernameSaveButton = document.getElementById('save-username-button')
+    const usernameInput = document.getElementById('username-input')
+    const username = document.getElementById('username')
+    const userRating = document.getElementById('user-rating')
+    const userRank = document.getElementById('user-rank')
+    const problemName = document.getElementById('problem-name')
+    const problemRating = document.getElementById('problem-rating')
+    const problemTags = document.getElementById('problem-tags')
+    const problemLink = document.getElementById('problem-link')
+    const submitContainer = document.getElementById('submit-container')
+    const submitButton = document.getElementById('submit-button')
+    const submitStatus = document.getElementById('submit-status')
+
+    let user = {}
+    let problem = {}
+    const problems = await getProblems()
+
+    usernameSaveButton.addEventListener('click', async function () {
+        user = await setUserDetails(usernameInput.value)
+        problem = await setProblemDetails(problems, user['solved'])
+
+        // Hide user input div
+        inputContainer.style.display = 'none';
+
+        if (username && userRating && userRank) {
+            username.textContent = user['username']
+            userRating.textContent = user['rating']
+            userRank.textContent = user['rank']
         }
-        const json = await response.json()
 
-        const user = {
-            'handle': json['result'][0]['handle'],
-            'organization': json['result'][0]['organization'],
-            'rank': json['result'][0]['rank'],
-            'rating': json['result'][0]['rating']
+        if (problemName && problemRating && problemTags && problemLink) {
+            problemName.textContent = problem['name']
+            problemRating.textContent = problem['rating']
+            problemTags.textContent = problem['tags'].join(', ')
+            problemLink.textContent = problem['url']
         }
-        return user
-    } catch (e) {
-        console.error('Error: ' + e)
-        throw e
-    }
-}
 
-const getProblems = async (problems_url) => {
-    try {
-        const response = await fetch(problems_url);
-        if (!response.ok) {
-            throw new Error('Network response not found')
+        if (submitContainer) {
+            submitContainer.style.display = 'block';
+            
+            submitStatus.textContent = 'Not Attempted'
         }
-        const json = await response.json()
-        const problems = json['result']['problems']
-
-        return problems
-
-    } catch (e) {
-        console.error('Error: ' + e)
-        throw e
-    }
-}
-
-const parseProblems = (problem_list) => {
-    const problems  = []
-    for (const key in problem_list) {
-        const contest_id = problem_list[key]['contestId']
-        const prob_index = problem_list[key]['index']
-        const problem_id = `${contest_id}-${prob_index}`
-
-        problems.push(problem_id)
-    }
-
-    return problems
-}
-
-const getUserSubmissions = async (user_submissions_url) => {
-    try {
-        const response = await fetch(user_submissions_url);
-        if (!response.ok) {
-            throw new Error('Network response not found')
-        }
-        const json = await response.json()
-        return json['result']
-        
-    } catch (e) {
-        console.error('Error: ' + e)
-        throw e
-    }
-}
-
-const getUserSolvedProblems =  (user_submissions) => {
-    const unique_solved = []
-
-    for (const key in user_submissions) {
-        const contest_id = user_submissions[key]['problem']['contestId']
-        const prob_index = user_submissions[key]['problem']['index']
-        const problem_id = `${contest_id}-${prob_index}`
-        const verdict = user_submissions[key]['verdict']
-
-        if (verdict == 'OK' && !(problem_id in unique_solved)) {
-            unique_solved.push(problem_id)
-        }
-    }
-
-    return unique_solved
-}
-
-const getRandomProblem = (problems, user_solved, random_number) => {
-    const unsolved = problems.filter(prob => !user_solved.includes(prob));
-    return unsolved[Math.floor(random_number) % unsolved.length]
-}
-
-const getProblemDetails = (problem_list, problem) => {
-    for (const key in problem_list) {
-        const contest_id = problem_list[key]['contestId']
-        const prob_index = problem_list[key]['index']
-        const problem_id = `${contest_id}-${prob_index}`
-
-        if (problem_id == problem) {
-            return {
-                'url': `https://codeforces.com/problemset/problem/${contest_id}/${prob_index}`,
-                'name': problem_list[key]['name'],
-                'rating': problem_list[key]['rating']
-            }
-        }
-    }
-}
-
-const padTo2Digits = (num) => {
-    return num.toString().padStart(2, '0');
-  }
-  
-const formatDate = (date) => {
-    return [
-      date.getFullYear(),
-      padTo2Digits(date.getMonth() + 1),
-      padTo2Digits(date.getDate()),
-    ].join('-');
-}
-
-async function main() {
-    const seedrandom = require('seedrandom')
-    const seed = formatDate(new Date())
-    const generator = seedrandom(seed);
-    const random_number = generator();
-
-    // User Information
-    const handle = '0paline'
-    const user_url = `https://codeforces.com/api/user.info?handles=${handle}`
-    const user = await getUserInformation(user_url)
-
-    // User solved
-    const user_submissions_url = `https://codeforces.com/api/user.status?handle=${handle}`
-    const user_submissions = await getUserSubmissions(user_submissions_url)
-    const user_solved = getUserSolvedProblems(user_submissions)
-
-    // Problems
-    const tags = ['implementation', 'strings']
-    const tags_query = tags.toString().replaceAll(',', ';')
-    const problems_url =`https://codeforces.com/api/problemset.problems?tags=${tags_query}`
-    const problems_list = await getProblems(problems_url)
-    const problems = parseProblems(problems_list)
+    })
     
-    // Get a random problem
-    const problem = getRandomProblem(problems, user_solved, random_number)
 
-    // Get random problem details
-    const problem_details = getProblemDetails(problems_list, problem)
-    console.log(problem_details)
+    chrome.storage.local.get(['user'], async function (result) {
+        if (result.user) {
+            user = result.user
+            username.textContent = user['username']
+            userRating.textContent = user['rating']
+            userRank.textContent = user['rank']
+    
+            inputContainer.style.display = 'none';
+        } else {
+            console.log('User not found');
+
+            inputContainer.style.display = 'block';
+        }
+    });
+
+    chrome.storage.local.get(['problem'], async function (result) {
+        if (result.problem) {
+            problem = result.problem
+
+            if (problemName && problemRating && problemTags && problemLink) {
+                problemName.textContent = problem['name']
+                problemRating.textContent = problem['rating']
+                problemTags.textContent = problem['tags'].join(', ')
+                problemLink.textContent = problem['url']
+            }
+        } else {
+            console.log('Problem not found');
+        }
+    });
+});
+
+const setProblemDetails = async (problems, solved) => {
+    const problem = getRandomProblem(problems, solved)
+    problem['url'] = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`
+
+    // Save problem to storage
+    chrome.storage.local.set({ problem: problem }, function () {
+        console.log('Problem saved: ' + problem['name']);
+    });
+
+    return problem
 }
 
-main()
+const setUserDetails = async (username) => {
+    const user = await getUserDetails(username)
+    user['solved'] = await getUserSubmissions(username)
+
+    // Save user to storage
+    chrome.storage.local.set({ user: user }, function () {
+        console.log('User saved: ' + user['username']);
+    });
+    
+    return user
+}
+
+const getRandomNumber = () => {
+    let seed = Date.now()
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280.0;
+}
+
+const getRandomProblem = (problems, solved) => {
+    // Get all problem ids and filer solved problems
+    let problemIds = Object.keys(problems)
+    problemIds = problemIds.filter(problemId => !solved.includes(problemId))
+
+    const random_number = getRandomNumber()
+    console.log('Random number: ' + random_number)
+
+    const randomIndex = Math.floor(random_number * problemIds.length) % problemIds.length
+    console.log('Random index: ' + randomIndex)
+
+    const problemId = problemIds[randomIndex]
+
+    return problems[problemId]
+}
+
+const getProblems = async () => {
+    let url = `https://codeforces.com/api/problemset.problems`
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const problems = data.result.problems
+
+        // Check if data.result exists and contains at least one element
+        if (problems && problems.length > 0) {
+            const parsedProblems = parseProblems(problems)
+            return parsedProblems
+        } else {
+            throw new Error('Problems not found');
+        }
+    } catch (error) {
+        console.error('Error fetching problems:', error);
+        throw error;
+    }
+}
+
+const parseProblems = (problems) => {
+    const parsedProblems = {}
+
+    for (const problem of problems) {
+        const problemId = `${problem.contestId}-${problem.index}`
+        parsedProblems[problemId] = problem
+    }
+
+    return parsedProblems
+}
+
+const getUserDetails = async (username) => {
+    let url = `https://codeforces.com/api/user.info?handles=${username}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        // Check if data.result exists and contains at least one element
+        if (data.result && data.result.length > 0) {
+            return {
+                'username': username,
+                'rating': data.result[0].rating,
+                'rank': data.result[0].rank
+            };
+        } else {
+            throw new Error('User data not found');
+        }
+    } catch (error) {
+        console.error('Error fetching user details:', error);
+        throw error; 
+    }
+};
+
+const getUserSubmissions = async (username) => {
+    let url = `https://codeforces.com/api/user.status?handle=${username}`
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        // Check if data.result exists and contains at least one element
+        if (data.result && data.result.length > 0) {
+            const submissions = data.result;
+            const solved = parseUserSubmissions(submissions);
+            return solved;
+        } else {
+            throw new Error('User submissions not found');
+        }
+
+    } catch (error) {
+        console.error('Error fetching user submissions:', error);
+        throw error; 
+    }
+}
+
+const parseUserSubmissions = (submissions) => {
+    const solvedProblems = [];
+    for (const submission of submissions) {
+        const constestId = submission.problem.contestId;
+        const problemIndex = submission.problem.index;
+        const verdict = submission.verdict;
+
+        const problemId = `${constestId}-${problemIndex}`;
+
+        if (verdict === 'OK' && !solvedProblems.includes(problemId)) {
+            solvedProblems.push(problemId);
+        }
+    }
+
+    return solvedProblems
+}
