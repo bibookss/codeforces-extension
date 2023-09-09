@@ -17,10 +17,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     const problemName = document.getElementById('problem-name')
     const problemRating = document.getElementById('problem-rating')
     const problemTags = document.getElementById('problem-tags')
-    const problemLink = document.getElementById('problem-link')
+    const problemButton = document.getElementById('problem-link')
     const submitContainer = document.getElementById('submit-container')
     const submitButton = document.getElementById('submit-button')
-    const submitStatus = document.getElementById('submit-status')
+    const submitStatus = document.getElementById('submission-status')
 
     let user = {}
     let problem = {}
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     usernameSaveButton.addEventListener('click', async function () {
         user = await setUserDetails(usernameInput.value)
-        // problem = await setProblemDetails(problems, user['solved'])
+        problem = await setProblemDetails(problems, user['solved'])
 
         // Hide user input div
         inputContainer.style.display = 'none';
@@ -41,6 +41,11 @@ document.addEventListener('DOMContentLoaded', async function () {
             userRating.textContent = user['rating']
             userRank.textContent = user['rank']
         }
+
+        if (submitContainer) {
+            submitContainer.style.display = 'block';
+            submitStatus.textContent = 'Not attempted'
+        }
     })
 
     changeUserButton.addEventListener('click', async function () {
@@ -52,11 +57,17 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Show user input div
         inputContainer.style.display = 'block';
 
+        // Hide change user button
+        changeUserButton.style.display = 'none';
+
         if (submitContainer) {
             submitContainer.style.display = 'none';
         }
     })
     
+    problemButton.addEventListener('click', async function () {
+        chrome.tabs.create({ url: problem['url'] });
+    })
 
     chrome.storage.local.get(['user'], async function (result) {
         if (result.user) {
@@ -67,6 +78,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     
             inputContainer.style.display = 'none';
             changeUserButton.style.display = 'block';
+
+            if (submitContainer) {
+                submitContainer.style.display = 'block';
+                submitStatus.textContent = 'Not attempted'
+            }
         } else {
             console.log('User not found');
 
@@ -86,12 +102,13 @@ document.addEventListener('DOMContentLoaded', async function () {
                 console.log('Date is same')
             }
 
-            if (problemName && problemRating && problemTags && problemLink) {
+            if (problemName && problemRating && problemTags && problemButton) {
                 problemName.textContent = problem['name']
                 problemRating.textContent = problem['rating']
                 problemTags.textContent = problem['tags'].join(', ')
-                problemLink.textContent = problem['url']
+                problemButton.style.display = 'block';
             }
+
         } else {
             console.log('Problem not found');
             problem = await setProblemDetails(problems, user['solved'])
